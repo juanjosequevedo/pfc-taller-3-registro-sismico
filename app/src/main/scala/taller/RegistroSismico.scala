@@ -13,10 +13,19 @@ class RegistroSismico {
   // Punto 1: consultas con expresiones for --------------------------------------
 
   /** Las regiones de los sismos que superan el umbral, en orden y con repetidos. */
-  def fuertes(r: Registro, umbral: Double): List[String] = ???
+  def fuertes(r: Registro, umbral: Double): List[String] =
+    for {
+      sismo <- r
+      if sismo.magnitud > umbral
+    }yield sismo.region
+
 
   /** Las magnitudes registradas en una región. */
-  def enRegion(r: Registro, region: String): List[Double] = ???
+  def enRegion(r: Registro, region: String): List[Double] =
+    for {
+      sismo <- r
+      if sismo.region == region
+    }yield sismo.magnitud
 
   /** Parejas de regiones distintas con algún sismo de magnitudes cercanas. */
   def paresCercanos(r: Registro, dif: Double): List[(String, String)] = ???

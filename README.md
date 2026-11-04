@@ -16,10 +16,10 @@ la nota.
 
 | Nombre completo | Código |
 |---|---|
-| | |
-| | |
-| | |
-| | |
+|Juan Jose Quevedo Piedrahita|2559861-3743|
+|Alejandro Marín Paez|2559890-3743|
+|Jose Miguel Herrera Murillo|2559971-3743|
+|David Cordoba Garzon|2559903-3743|
 
 ## Cómo está organizado el proyecto
 
