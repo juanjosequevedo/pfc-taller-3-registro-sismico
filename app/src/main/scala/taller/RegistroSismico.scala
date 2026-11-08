@@ -28,26 +28,67 @@ class RegistroSismico {
     }yield sismo.magnitud
 
   /** Parejas de regiones distintas con algún sismo de magnitudes cercanas. */
-  def paresCercanos(r: Registro, dif: Double): List[(String, String)] = ???
+  def paresCercanos(r: Registro, dif: Double): List[(String, String)] = {
+    val regiones = r.map(s => s.region).distinct
+
+    (for{
+      region1 <- regiones
+      region2 <- regiones
+      if regiones.indexOf(region1) < regiones.indexOf(region2)
+      sismo1 <- r
+      sismo2 <- r
+      if sismo1.region == region1
+      if sismo2.region == region2
+      if math.abs(sismo1.magnitud - sismo2.magnitud) <= dif
+    }yield (region1, region2)).distinct
+  }
 
   // Punto 2: agrupar con mapas --------------------------------------------------
 
-  def porRegion(r: Registro): Map[String, List[Sismo]] = ???
+  def porRegion(r: Registro): Map[String, List[Sismo]] =
+    r.groupBy(s => s.region)
 
-  def conteoPorRegion(r: Registro): Map[String, Int] = ???
+  def conteoPorRegion(r: Registro): Map[String, Int] = {
+    val regiones = porRegion(r)
 
-  def magnitudMaxima(r: Registro): Map[String, Double] = ???
+    regiones.map{ case (region, sismos) =>
+      region -> sismos.length
+    }
+  }
+
+  def magnitudMaxima(r: Registro): Map[String, Double] = {
+    val regiones = porRegion(r)
+
+    regiones.map{ case (region, sismos) =>
+    region -> sismos.map(s => s.magnitud).max}
+  }
 
   // Punto 3: consultas seguras --------------------------------------------------
 
   /** Un mapa que responde cero por las regiones que no están en el registro. */
-  def conteoSeguro(r: Registro): Map[String, Int] = ???
+  def conteoSeguro(r: Registro): Map[String, Int] =
+    conteoPorRegion(r).withDefaultValue(0)
 
   /** La magnitud máxima de una región, o vacío si no hay registros suyos. */
-  def maximaDe(r: Registro, region: String): Option[Double] = ???
+  def maximaDe(r: Registro, region: String): Option[Double] = {
+
+    magnitudMaxima(r).get(region)
+  }
 
   /** La región con más sismos; en empate, la primera en orden alfabético. */
-  def regionMasActiva(r: Registro): Option[String] = ???
+  def regionMasActiva(r: Registro): Option[String] = {
+
+    if (r.isEmpty) None
+    else
+      {
+        val apoyo = conteoPorRegion(r)
+
+        apoyo.toList.sortBy{ case (region, numerodesismos) =>
+          (-numerodesismos, region)}.headOption.map{
+          case (region, numerodesismos) => region
+        }
+      }
+  }
 
   // Punto 4: réplicas perezosas -------------------------------------------------
 
