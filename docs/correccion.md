@@ -1,279 +1,603 @@
-# Ejemplo de informe de corrección
+Para justificar las consultas, primero revisamos qué ocurre con una
+lista vacía. Después suponemos que la respuesta para el resto del
+registro es correcta y vemos qué pasa al añadir un sismo al frente.
 
-Fundamentos de Programación Funcional y Concurrente.
-Documento realizado por el docente Juan Francisco Díaz.
+En las réplicas revisamos los primeros valores que se solicitan.
+La secuencia completa no tiene un último elemento.
 
-## 1. Argumentar la corrección de programas recursivos
+Usamos estas convenciones:
 
-Sea $f : A \to B$ una función, y $A$ un conjunto definido recursivamente
-(recordar la definición de Matemáticas Discretas I), como por ejemplo los
-naturales o las listas.
+- $[]$ representa una lista vacía.
+- $s :: r$ es una lista cuyo primer sismo es $s$ y cuyo resto es $r$.
+- $m(s)$ indica la magnitud de un evento.
+- $g(s)$ representa su región.
+- $|r|$ es la cantidad de elementos de una lista.
 
-Sea $P_f$ un programa recursivo (lineal o en árbol) desarrollado en Scala (o en
-cualquier lenguaje de programación) hecho para calcular $f$:
+Trabajamos con registros finitos y magnitudes finitas. Para las consultas
+de réplicas sensibles, el mínimo es mayor o igual a cero, como exige
+la comprobación escrita en el código.
+
+## 1. Consultas con `for`
+
+### 1.1. Corrección de `fuertes`
+
+#### Qué debe calcular
+
+Llamamos $F(r,u)$ a la lista de regiones cuyos sismos superan el
+umbral $u$, respetando el orden y las repeticiones.
+
+Con una entrada vacía:
+
+$$
+F([],u)=[]
+$$
+
+Si el primer sismo supera el umbral:
+
+$$
+F(s::r,u)=g(s)::F(r,u)
+$$
+
+Cuando no lo supera:
+
+$$
+F(s::r,u)=F(r,u)
+$$
+
+#### Caso base
+
+Si `r` está vacío, el `for` no encuentra elementos y produce `List()`.
+Esto coincide con la definición.
+
+#### Paso con un sismo más
+
+Suponemos que la consulta funciona para el resto del registro.
+
+Al añadir un evento al frente, la condición comprueba si su magnitud
+es mayor que el umbral. Si cumple, `yield` agrega su región antes de
+los resultados del resto. En caso contrario, no aporta ningún nombre.
+
+Así se obtiene exactamente la lista pedida. No se quitan repetidos
+ni se cambia el orden.
+
+#### Terminación
+
+El recorrido revisa una lista finita. Cada sismo se considera una vez,
+por lo que la consulta termina al llegar al final.
+
+### 1.2. Corrección de `enRegion`
+
+#### Qué debe calcular
+
+Sea $E(r,a)$ la lista de magnitudes registradas en la región $a$.
+
+$$
+E([],a)=[]
+$$
+
+Si el primer evento pertenece a esa región:
+
+$$
+E(s::r,a)=m(s)::E(r,a)
+$$
+
+Cuando corresponde a otra:
+
+$$
+E(s::r,a)=E(r,a)
+$$
+
+#### Caso base
+
+Una lista vacía no contiene eventos de ninguna región. El resultado
+`List()` es el esperado.
+
+#### Paso con un sismo más
+
+Suponemos que las magnitudes del resto ya se obtienen correctamente.
+
+El código compara la región del primer evento con la solicitada.
+Si son iguales, añade su magnitud. Si son distintas, continúa sin
+incluirla.
+
+Los resultados del resto mantienen su posición, así que la respuesta
+contiene todas las magnitudes buscadas en el orden original.
+
+#### Terminación
+
+La consulta termina porque el registro tiene una cantidad finita
+de elementos.
+
+### 1.3. Corrección de `paresCercanos`
+
+#### Qué debe calcular
+
+Una pareja de regiones diferentes debe aparecer cuando existen dos
+sismos, uno de cada región, cuyas magnitudes cumplen:
+
+$$
+|m(s_1)-m(s_2)|\leq dif
+$$
+
+Cada pareja debe salir una sola vez y sus nombres deben respetar
+la primera aparición de las regiones en el registro.
+
+#### Regiones distintas y orden
+
+La lista `regiones` se obtiene quitando nombres repetidos con `distinct`.
+
+Llamamos $pos(a)$ a la posición de la región $a$ en esa lista.
+La condición del código exige:
+
+$$
+pos(region1)<pos(region2)
+$$
+
+Una región no puede estar antes que ella misma. Por eso quedan fuera
+las parejas de nombres iguales.
+
+Además, si una pareja cumple esa comparación, la pareja invertida
+no puede cumplirla. Así se conserva una sola orientación.
+
+#### Parejas que se incluyen
+
+Antes de producir una respuesta, el código comprueba que cada sismo
+pertenece a la región que le corresponde y que la diferencia entre
+las magnitudes no supera `dif`.
+
+Por tanto, toda pareja incluida tiene dos eventos que justifican
+su presencia.
+
+#### Parejas que deben encontrarse
+
+Los recorridos consideran todas las regiones y todos los sismos.
+Si existe una pareja válida, sus eventos se revisan en algún momento
+y las condiciones permiten incluirla.
+
+Cuando varias combinaciones producen los mismos nombres, el último
+`distinct` conserva únicamente la primera aparición.
+
+Si no hay datos, o solo existe una región, no se obtiene ninguna pareja.
+
+#### Terminación
+
+Las cuatro listas recorridas son finitas. Aunque se comparen varias
+combinaciones, la cantidad de revisiones también es finita.
+
+## 2. Agrupación por región
+
+### 2.1. Corrección de `porRegion`
+
+#### Qué debe calcular
+
+Para explicar los grupos, llamamos $G(r,a)$ a la lista de sismos de
+la región $a$ dentro de $r$.
+
+Cuando no hay eventos:
+
+$$
+G([],a)=[]
+$$
+
+Si el primer sismo pertenece a $a$:
+
+$$
+G(s::r,a)=s::G(r,a)
+$$
+
+Si corresponde a otra región:
+
+$$
+G(s::r,a)=G(r,a)
+$$
+
+Esta notación permite hablar de una lista vacía para una región ausente.
+En el mapa real, esas regiones no tienen una entrada.
+
+#### Caso base
+
+`groupBy` aplicado a una lista vacía produce `Map()`. No crea grupos
+sin sismos.
+
+#### Paso con un sismo más
+
+Suponemos que los eventos del resto están en sus grupos correctos.
+
+Al añadir un sismo, `groupBy` usa su región para ubicarlo. El evento
+solo pertenece a ese grupo y los demás conservan sus integrantes.
+
+Cada aparición del registro se mantiene, incluso si hay dos sismos
+con los mismos datos.
+
+Por eso el resultado reúne todos los eventos por región, sin perderlos
+ni enviarlos a un grupo diferente.
+
+### 2.2. Corrección de `conteoPorRegion`
+
+Llamamos $C(r,a)$ a la cantidad de sismos de la región $a$.
+
+$$
+C(r,a)=|G(r,a)|
+$$
+
+Si no hay eventos de esa región, la cantidad es cero. Al añadir
+un sismo suyo, aumenta en uno:
+
+$$
+C(s::r,a)=1+C(r,a)\qquad\text{si }g(s)=a
+$$
+
+Si el evento pertenece a otra región, el conteo permanece igual:
+
+$$
+C(s::r,a)=C(r,a)\qquad\text{si }g(s)\neq a
+$$
+
+`porRegion` forma los grupos correctamente. Luego, `length` obtiene
+el número de elementos de cada lista, que coincide con $C(r,a)$.
+
+El mapa solo incluye regiones presentes. Con un registro vacío,
+la respuesta es `Map()`.
+
+### 2.3. Corrección de `magnitudMaxima`
+
+Para una región presente en el registro, llamamos $M(r,a)$ a su mayor
+magnitud:
+
+$$
+M(r,a)=\max\{m(s)\mid s\text{ pertenece a }G(r,a)\}
+$$
+
+#### Grupo con un sismo
+
+Si solo existe un evento, su magnitud es también la mayor.
+La operación `max` devuelve ese valor.
+
+#### Grupo con un elemento más
+
+Suponemos que ya conocemos el máximo de los demás eventos.
+Al incluir una nueva magnitud, hay dos posibilidades:
+
+- Si supera el máximo anterior, pasa a ser la mayor.
+- Si es menor o igual, se conserva el valor que ya se tenía.
+
+Esto se expresa como:
+
+$$
+M(s::r,a)=\max(m(s),M(r,a))
+$$
+
+La fórmula corresponde al caso en que $s$ pertenece a $a$ y esa región
+ya tenía eventos en $r$. Si es su primer sismo, el máximo es $m(s)$.
+
+El código obtiene las magnitudes del grupo y aplica `max`, que realiza
+esa elección.
+
+#### Listas vacías
+
+Cada grupo creado por `porRegion` contiene al menos un evento.
+Por eso no se busca el máximo de una lista vacía.
+
+Si el registro completo está vacío, no hay grupos que procesar y
+se devuelve `Map()`.
+
+#### Terminación del punto 2
+
+Las tres funciones trabajan con el registro y con grupos finitos.
+Agrupar, contar y buscar el máximo terminan después de revisar
+sus elementos.
+
+## 3. Consultas seguras
+
+### 3.1. Corrección de `conteoSeguro`
+
+Para una región registrada, la respuesta debe ser su cantidad de
+eventos. Si no aparece, debe ser cero.
+
+$$
+conteoSeguro(r)(a)=\begin{cases}C(r,a)&\text{si }a\text{ aparece en }r\\0&\text{si }a\text{ no aparece en }r\end{cases}
+$$
+
+`conteoPorRegion` ya calcula correctamente los valores existentes.
+`withDefaultValue(0)` establece la respuesta para una consulta con
+paréntesis a un nombre que no está en el mapa.
+
+No cambia los conteos ni agrega regiones ausentes.
+
+### 3.2. Corrección de `maximaDe`
+
+Para una región con eventos, la consulta debe entregar su magnitud
+máxima dentro de `Some`. Cuando no hay datos, debe devolver `None`.
+
+$$
+maximaDe(r,a)=\begin{cases}\operatorname{Some}(M(r,a))&\text{si }a\text{ aparece en }r\\\operatorname{None}&\text{si }a\text{ no aparece en }r\end{cases}
+$$
+
+La función usa el mapa de máximos, cuya respuesta se justificó en
+el punto anterior.
+
+Al aplicar `get`, obtiene `Some` con el valor guardado o `None` si
+el nombre está ausente. Ambos casos coinciden con lo solicitado.
+
+### 3.3. Corrección de `regionMasActiva`
+
+#### Registro vacío
+
+Cuando no hay sismos, no existe una región que pueda elegirse.
+La condición inicial devuelve `None`.
+
+#### Registro con eventos
+
+La región elegida debe tener el mayor conteo. Si la llamamos $a^*$:
+
+$$
+C(r,a^*)=\max\{C(r,a)\mid a\text{ aparece en }r\}
+$$
+
+El código ordena por:
+
+$$
+(-C(r,a),a)
+$$
+
+Si una cantidad es mayor que otra, su valor negativo es menor.
+Por eso, al ordenar de menor a mayor, los conteos más altos
+quedan primero.
+
+Cuando las cantidades coinciden, se compara el nombre de la región.
+Así se resuelve el empate por orden alfabético.
+
+`headOption` toma la primera entrada y `map` conserva su nombre,
+dentro de `Some`.
+
+#### Terminación del punto 3
+
+Los conteos y máximos se obtienen de listas finitas. Las búsquedas
+terminan y el ordenamiento tiene una cantidad finita de regiones.
+
+## 4. Réplicas
+
+### 4.1. Corrección del redondeo
+
+Llamamos $R(x)$ al cálculo utilizado para redondear:
+
+$$
+R(x)=\frac{\operatorname{round}(100x)}{100}
+$$
+
+Multiplicar por cien lleva los dos primeros decimales a la parte
+entera. `Math.round` elige el entero correspondiente y la división
+por `100.0` devuelve el valor a su escala original.
+
+Esta es la misma operación indicada en el enunciado.
+
+### 4.2. Corrección de `replicas`
+
+#### Qué debe producir
+
+Partimos de la magnitud recibida:
+
+$$
+m_0=magnitud
+$$
+
+Cada paso calcula:
+
+$$
+m_{n+1}=0.8\,m_n
+$$
+
+El valor que se entrega en la posición $n$ es:
+
+$$
+a_n=R(m_n)
+$$
+
+El código usa `Double` para estas operaciones. El redondeo se aplica
+al valor entregado, mientras que el siguiente cálculo parte de
+`magnitud`, como aparece en la llamada:
 
 ```scala
-def Pf(a: A): B = { // Pf recibe a de tipo A, y devuelve f(a) de tipo B
-  ...
-}
+replicas(magnitud * 0.8)
 ```
 
-¿Cómo argumentar que $P_f(a)$ siempre devuelve $f(a)$ como respuesta? Es decir,
-¿cómo argumentar que $P_f$ es correcto con respecto a su especificación?
+#### Primer elemento
 
-La respuesta es sencilla: demostrando el siguiente teorema.
+La función calcula `redondear(magnitud)`, que corresponde a $R(m_0)$.
+Por tanto, el primer valor es el esperado.
 
-```math
-\forall a \in A : P_f(a) == f(a)
-```
+#### Siguiente elemento
 
-Cuando uno tiene que demostrar que algo se cumple para todos los elementos de
-un conjunto definido recursivamente, es natural usar inducción estructural. En
-términos prácticos, esto significa demostrar que:
+Suponemos que se han obtenido correctamente los primeros valores.
 
-- Para cada valor básico $a$ de $A$, se tiene que $P_f(a) == f(a)$.
-- Para cada valor $a \in A$ construido recursivamente a partir de otro(s)
-  valor(es) $a' \in A$, se tiene que
-  $P_f(a') == f(a') \rightarrow P_f(a) == f(a)$. (Esta es la hipótesis de
-  inducción).
+Al pedir otro elemento, la parte pendiente llama a `replicas` con
+la magnitud anterior multiplicada por `0.8`. Esa llamada redondea
+el nuevo dato y deja preparado el siguiente paso.
 
-### Ejemplo: factorial recursivo
+De esta manera, cada posición cumple la regla indicada.
 
-Sea $f : \mathbb{N} \to \mathbb{N}$ la función que calcula el factorial de un
-número natural, es decir, $f(n) = n!$. Y sea $P_f$ el siguiente programa en
-Scala:
+#### Cantidad finita de valores
 
-```scala
-def Pf(n: Int): Int = { // Pf recibe n de tipo Int, y devuelve n! de tipo Int
-  if (n == 0) 1 else n * Pf(n - 1)
-}
-```
+Para comprobar esta función se considera una cantidad finita $n$:
 
-Vamos a demostrar que $\forall n \in \mathbb{N} : P_f(n) == n!$
+$$
+replicas(magnitud).take(n).toList=[a_0,a_1,\ldots,a_{n-1}]
+$$
 
-**Caso base:** $n = 0$
+Para $n=0$, el resultado es una lista vacía.
 
-```math
-P_f(0) \rightarrow \text{if } (0 == 0)\ 1 \text{ else } 0 \ast P_f(-1) \rightarrow 1
-```
+Si los primeros $n$ valores son correctos, pedir uno más calcula
+$a_n$ mediante la misma regla. Así también son correctos los
+primeros $n+1$.
 
-Por otro lado, $f(0) = 0! = 1$. Entonces $P_f(0) == f(0)$.
+La parte que sigue queda pendiente gracias a `#::`. Por eso pedir
+cuatro valores no obliga a calcular una secuencia completa que
+no tiene final.
 
-**Caso de inducción:** $n = k + 1$, $k \geq 0$. Hay que demostrar:
-$P_f(k) == f(k) \rightarrow P_f(k + 1) == f(k + 1)$
+### 4.3. Corrección de `replicasSensibles`
 
-```math
-P_f(k+1) \rightarrow \text{if } (k+1 == 0)\ 1 \text{ else } (k+1) \ast P_f(k) \rightarrow (k+1) \ast P_f(k)
-```
+#### Qué debe calcular
 
-Usando la hipótesis de inducción (HI):
+Sea $u$ el mínimo y sean $a_0,a_1,\ldots$ los valores de `replicas`.
 
-```math
-\rightarrow (k+1) \ast k! = (k+1)!
-```
+Se deben conservar los elementos desde el inicio hasta encontrar
+el primero que no supere $u$.
 
-Por lo tanto, $P_f(k + 1) == f(k + 1)$.
+Si $k$ es la posición de ese primer valor rechazado:
 
-Concluimos por inducción que $\forall n \in \mathbb{N} : P_f(n) == n!$
+$$
+a_i>u\quad\text{para }0\leq i<k
+$$
 
-### Ejemplo: el máximo de una lista
+$$
+a_k\leq u
+$$
 
-Sea $f : \text{List}[\mathbb{N}] \to \mathbb{N}$ la función que calcula el
-máximo de una lista de enteros positivos, no vacía. Y sea $P_f$ el siguiente
-programa en Scala:
+Entonces la respuesta es:
 
-```scala
-def maxLin(l: List[Int]): Int = {
-  if (l.tail.isEmpty) l.head
-  else math.max(maxLin(l.tail), l.head)
-}
-```
+$$
+[a_0,a_1,\ldots,a_{k-1}]
+$$
 
-Demostraremos que:
+Cuando el primer elemento ya incumple la condición, $k=0$ y
+la lista queda vacía.
 
-```math
-\forall n \in \mathbb{N} \setminus \{0\} : P_f(\text{List}(a_1, a_2, \ldots, a_n)) == f(\text{List}(a_1, a_2, \ldots, a_n))
-```
+#### Correspondencia con el código
 
-**Caso base:** $n = 1$
+`takeWhile(_ > minimo)` revisa los elementos en orden y conserva
+cada uno mientras la comparación sea verdadera.
 
-```math
-P_f(\text{List}(a_1)) \rightarrow \text{if } \text{List}(a_1).\text{tail.isEmpty then } \text{List}(a_1).\text{head else } \ldots \rightarrow \text{List}(a_1).\text{head} \rightarrow a_1
-```
+Al llegar al primero que no cumple, se detiene. Por eso no incluye
+valores iguales al mínimo y tampoco continúa buscando después.
 
-Por otro lado, $f(\text{List}(a_1)) = a_1$. Entonces
-$P_f(\text{List}(a_1)) == f(\text{List}(a_1))$.
+`toList` convierte únicamente esa parte seleccionada.
 
-**Caso de inducción:** $n = k + 1$, $k \geq 1$. Se debe demostrar:
+#### Terminación
 
-```math
-P_f(\text{List}(b_1, b_2, \ldots, b_k)) == f(\text{List}(b_1, b_2, \ldots, b_k)) \rightarrow P_f(\text{List}(a_1, a_2, \ldots, a_{k+1})) == f(\text{List}(a_1, a_2, \ldots, a_{k+1}))
-```
+El código exige un mínimo mayor o igual a cero.
 
-Empecemos por calcular qué devuelve $P_f$ usando el modelo de sustitución:
+Si la magnitud inicial es positiva, multiplicarla repetidamente
+por `0.8` la reduce. El valor entregado termina siendo menor o
+igual al mínimo.
 
-```math
-P_f(L) \rightarrow \text{if } L.\text{tail.isEmpty then } L.\text{head else math.max}(P_f(L.\text{tail}), L.\text{head})
-```
+Incluso cuando el mínimo es cero, el redondeo acaba produciendo
+`0.0`, que ya no cumple la comparación estricta.
 
-```math
-\rightarrow \text{math.max}(P_f(\text{List}(a_2, \ldots, a_{k+1})), a_1)
-```
-
-Sea $b = P_f(\text{List}(a_2, \ldots, a_{k+1}))$; por la hipótesis de
-inducción, $b = f(\text{List}(a_2, \ldots, a_{k+1}))$. Hay dos posibilidades:
+Si el primer valor redondeado es menor o igual al mínimo, el
+recorrido se detiene desde el inicio.
 
-- Si $\text{math.max}(b, a_1) = b$, entonces $b \geq a_1$ y
- $b == f(\text{List}(a_1, a_2, \ldots, a_{k+1}))$.
-- Si $\text{math.max}(b, a_1) = a_1$, entonces $a_1 \geq b$ y
- $a_1 == f(\text{List}(a_1, a_2, \ldots, a_{k+1}))$.
+Por tanto, con las entradas consideradas, se obtiene una lista
+finita.
 
-Por lo tanto, $P_f(L) == f(L)$.
+## 5. Corrección de `informe`
 
-Concluimos por inducción que:
+#### Qué debe calcular
 
-```math
-\forall n \in \mathbb{N} \setminus \{0\} : P_f(\text{List}(a_1, a_2, \ldots, a_n)) == f(\text{List}(a_1, a_2, \ldots, a_n))
-```
-
-## 2. Argumentar la corrección de programas iterativos
-
-Para argumentar la corrección de programas iterativos, se debe formalizar cómo
-es la iteración. Esto implica definir:
+Para cada región presente, el informe debe reunir:
 
-- Cómo se representa un estado de la iteración, $s$.
-- Cuál es el estado inicial, $s_0$.
-- Cuál es el estado final (o cómo se reconoce que un estado es final): $s_f$.
-- Qué condición (o predicado) cumple todo estado: $\text{Inv}(s)$ (invariante
-  de la iteración).
-- El mecanismo para pasar de un estado al siguiente: $\text{transformar}(s)$.
-  Si $s_i$ es el estado $i$, entonces $\text{transformar}(s_i) = s_{i+1}$.
-
-Un programa iterativo tiene la siguiente forma:
-
-```scala
-def Pf(a: A): B = { // Pf recibe a de tipo A, y devuelve f(a) de tipo B
-  def Pf_iter(s: Estado): B =
-    if (esFinal(s)) respuesta(s) else Pf_iter(transformar(s))
-  Pf_iter(s0)
-}
-```
+1. La cantidad de sismos.
+2. Su mayor magnitud.
+3. El número de réplicas sensibles de esa magnitud máxima.
 
-Demostración de corrección:
+Llamamos $K(m,u)$ al tamaño de la lista de réplicas sensibles:
 
-- $\text{Inv}(s_0)$: el estado inicial cumple la condición invariante.
-- Si $(s_i \neq s_f \land \text{Inv}(s_i)) \rightarrow \text{Inv}(\text{transformar}(s_i))$:
-  el nuevo estado cumple la condición invariante si el estado anterior la
-  cumplía.
-- De lo anterior se concluye $\text{Inv}(s_f)$, es decir, el estado final
-  cumple la condición invariante. Luego,
-  $\text{Inv}(s_f) \rightarrow \text{respuesta}(s_f) == f(a)$.
-- Finalmente, demostrar que siempre se llega al estado final $s_f$. Esto
-  implica que
-  $P_f(a) == \text{iter}(s_0) == \text{respuesta}(s_f) == f(a)$.
+$$
+K(m,u)=|replicasSensibles(m,u)|
+$$
 
-### Ejemplo: factorial iterativo
+La entrada correspondiente a una región $a$ debe ser:
 
-Considere el siguiente programa iterativo en Scala para calcular la función
-factorial:
+$$
+informe(r,u)(a)=Resumen(C(r,a),M(r,a),K(M(r,a),u))
+$$
 
-```scala
-def Pf(n: Int): Int = { // Pf recibe n de tipo Int, y devuelve n! de tipo Int
-  def Pf_iter(i: Int, n: Int, ac: Int): Int =
-    if (i > n) ac else Pf_iter(i + 1, n, i * ac)
-  Pf_iter(1, n, 1)
-}
-```
+#### Registro vacío
 
-Este programa implementa el siguiente proceso iterativo:
+Si no hay sismos, `conteos` y `maximas` quedan vacíos.
+El recorrido no produce entradas y entrega `Map()`.
 
-- Un estado $s = (i, n, ac)$.
-- El estado inicial es $s_0 = (1, n, 1)$.
-- $(i, n, ac)$ es final si $i > n$, o lo que es lo mismo, si $i = n + 1$.
-- La invariante de ciclo es
-  $\text{Inv}(i, n, ac) \equiv i \leq n + 1 \land ac = (i-1)!$.
-  La invariante de ciclo es una relación que SIEMPRE se cumple en el ciclo.
-- $\text{transformar}((i, n, ac)) = (i+1, n, i \ast ac)$.
+#### Registro con eventos
 
-Ahora, demostramos los puntos mencionados:
+Los dos mapas parten del mismo registro, así que contienen los
+mismos nombres de región.
 
-**1.** $\text{Inv}(s_0)$: el estado inicial cumple la condición invariante.
+Para cada entrada de `maximas`:
 
-```math
-s_0 = (1, n, 1) \implies 1 \leq n + 1 \land 1 = 0!
-```
+- `conteos(region)` obtiene la cantidad correcta.
+- `maxima` es la mayor magnitud de ese grupo.
+- `replicasSensibles(maxima, minimo)` genera los valores pedidos.
+- `length` cuenta cuántos se obtuvieron.
 
-**2.** La invariante se mantiene con la transformación de estados,
-$(s_i \neq s_f \land \text{Inv}(s_i)) \rightarrow \text{Inv}(\text{transformar}(s_i))$:
+Al construir `Resumen`, los tres datos ocupan el lugar que les
+corresponde.
 
-1. Primer cambio, $i = i + 1$, lo que implica $ac = ((i+1) - 1)! = i!$.
-2. Segundo cambio, $ac = i \ast ac$, entonces $ac = (i - 1)! \ast i = i!$.
-3. Como se puede ver en ambos cambios indicados en la transformación, la
-   invariante se mantiene.
+#### Terminación
 
-**3.** $\text{Inv}(s_f) \rightarrow \text{respuesta}(s_f) == f(a)$
+El registro tiene una cantidad finita de regiones. Para cada una,
+el cálculo de réplicas sensibles termina bajo las condiciones
+explicadas en el punto 4. Por eso también finaliza el informe.
 
-```math
-(n + 1 \leq n + 1) \land ac = ((n+1)-1)! \rightarrow ac == n!
-```
+## 6. Qué ocurre al cambiar el orden del registro
 
-**4.** En cada paso, la componente $i$ del estado incrementa, acercándose a $n+1$.
-Después de $n$ iteraciones, se alcanza $n+1$.
+Llamamos $r'$ a una lista con los mismos eventos que $r$, incluyendo
+sus repeticiones, pero colocados en otro orden.
 
-Esto implica que $P_f(n) == \text{iter}(1, n, 1) == n!$
+### Grupos y conteos
 
-### Ejemplo: el máximo de una lista
+Cada sismo sigue teniendo la misma región, sin importar su posición.
+Por eso pertenece al mismo grupo y se conserva la cantidad de
+apariciones:
 
-Se desea calcular el máximo de una lista de enteros positivos, no vacía. Sea
-$f : \text{List}[\mathbb{N}] \to \mathbb{N}$ la función que calcula ese valor.
-Y sea $P_f$ el siguiente programa en Scala:
+$$
+C(r',a)=C(r,a)
+$$
 
-```scala
-def maxIt(l: List[Int]): Int = {
-  def maxAux(max: Int, l: List[Int]): Int = {
-    if (l.isEmpty) max
-    else maxAux(math.max(max, l.head), l.tail)
-  }
-  maxAux(l.head, l.tail)
-}
-```
+El conteo depende de cuántos eventos hay en cada región, no de cuál
+se revisó primero.
 
-Este programa implementa el siguiente proceso iterativo:
+### Magnitudes máximas
 
-- Un estado $s = (max, l)$ donde $l = \text{List}(a_i, a_{i+1}, \ldots, a_k)$
-  es una cola de $L$.
-- El estado inicial es
-  $s_0 = (L.\text{head}, L.\text{tail}) = (a_1, \text{List}(a_2, \ldots, a_k))$.
-- $s = (max, l)$ es final si $l$ es vacía.
-- $\text{Inv}(max, l) \equiv l = \text{List}(a_i, a_{i+1}, \ldots, a_k) \land max = f(\text{List}(a_1, a_2, \ldots, a_{i-1}))$.
-- $\text{transformar}((max, l)) = (nmax, l.\text{tail})$ donde $nmax = max$ si
-  $max \geq l.\text{head}$, y $nmax = l.\text{head}$ si no.
+Reordenar los eventos tampoco cambia sus magnitudes. El mayor
+valor de cada grupo sigue siendo el mismo:
 
-Demostración de los puntos:
+$$
+M(r',a)=M(r,a)
+$$
 
-**1.** $\text{Inv}(s_0)$: el estado inicial cumple la condición invariante.
+Por ejemplo, las listas `List(4.2, 3.8, 5.3)` y
+`List(5.3, 3.8, 4.2)` tienen tres elementos y su máximo es `5.3`.
 
-```math
-s_0 = (a_1, \text{List}(a_2, \ldots, a_k)) \implies a_1 = f(\text{List}(a_1))
-```
+### Consultas e informe
 
-**2.** $(s_i \neq s_f \land \text{Inv}(s_i)) \rightarrow \text{Inv}(\text{transformar}(s_i))$
+Como los conteos y máximos se conservan:
 
-```math
-\neg\, l.\text{isEmpty} \land l = \text{List}(a_i, a_{i+1}, \ldots, a_k) \land max = f(\text{List}(a_1, a_2, \ldots, a_{i-1}))
-```
+- `conteoSeguro` responde las mismas cantidades.
+- `maximaDe` encuentra los mismos valores.
+- `regionMasActiva` elige el mismo nombre, porque además resuelve
+  los empates alfabéticamente.
+- `informe` produce los mismos resúmenes para un mínimo fijo.
 
-```math
-\rightarrow l.\text{tail} = \text{List}(a_{i+1}, \ldots, a_k) \land nmax = f(\text{List}(a_1, \ldots, a_i))
-```
+En particular:
 
-**3.** $\text{Inv}(s_f) \rightarrow \text{respuesta}(s_f) == f(a)$
+$$
+informe(r',u)=informe(r,u)
+$$
 
-```math
-\text{Inv}((max, \text{List}())) \rightarrow max = f(\text{List}(a_1, \ldots, a_k))
-```
+Las réplicas dependen de la magnitud máxima y del mínimo. Si ambos
+datos siguen iguales, también se conserva su cantidad.
 
-**4.** En cada paso, la lista $l$ se reduce, acercándose a ser vacía. Después de
-$k$ iteraciones, $l = \text{List}()$.
+### Qué sí puede cambiar
 
-Esto implica que $P_f(L) == \text{maxAux}(L.\text{head}, L.\text{tail}) == f(L)$
+En `porRegion`, cada grupo mantiene los mismos eventos, pero la lista
+interna puede quedar en otro orden. Por eso no afirmamos que los dos
+mapas de listas sean siempre iguales al compararlos directamente.
+
+`fuertes` y `enRegion` también pueden cambiar el orden de sus respuestas,
+porque deben respetar la lista de entrada.
+
+En `paresCercanos` se conservan las mismas parejas de regiones si se
+consideran sin orientación. Sin embargo, su presentación puede cambiar,
+ya que los nombres se organizan según su primera aparición.
+
+El orden en que se muestran las entradas de un mapa no cambia los
+valores asociados a cada región.
