@@ -97,7 +97,7 @@ class RegistroSismico {
   /** La secuencia infinita que empieza en la magnitud y multiplica por 0.8. */
   def replicas(magnitud: Double): LazyList[Double] = {
     val actual = redondear(magnitud)
-    actual #:: replicas(actual * 0.8)
+    actual #:: replicas(magnitud * 0.8)
   }
 
   /** Las réplicas mientras superen el mínimo, incluida la primera. */
@@ -109,5 +109,16 @@ class RegistroSismico {
   // Punto 5: informe combinado --------------------------------------------------
 
   /** Conteo, magnitud máxima y réplicas esperadas del sismo más fuerte, por región. */
-  def informe(r: Registro, minimo: Double): Map[String, Resumen] = ???
-}
+  def informe(r: Registro, minimo: Double): Map[String, Resumen] = {
+  val conteos = conteoPorRegion(r)
+  val maximas = magnitudMaxima(r)
+
+  maximas.map {
+    case (region, maxima) =>
+    val cantidad = conteos(region)
+    val cantidadReplicas = replicasSensibles(maxima, minimo).length
+
+    region -> Resumen(cantidad, maxima, cantidadReplicas)
+      }
+    }
+  }
